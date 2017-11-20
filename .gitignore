@@ -1,0 +1,6 @@
+# ignore eclipse files
+*.project
+*.pydevproject
+*.pyc
+*~
+.idea/*
