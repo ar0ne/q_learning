@@ -38,7 +38,11 @@ class QLearning():
     def __init__(self):
         self.WIDTH = 16
         self.HEIGHT = 9
+        self.WALK_REWARDS = -0.04
+        self.GAMMA = .8
+        self.EPOCHS = 10
 
+        # Init Q matrix
         self.Q = self.init_q()
 
         # Rewards matrix
@@ -55,10 +59,12 @@ class QLearning():
         ]
 
         self.score = 10
-        self.walk_reward = -0.04
+        self.success = 0
+        self.failures = 0
 
-        self.Gamma = .8
-        self.Epochs = 10
+    @staticmethod
+    def default_state():
+        return State(0, 8)
 
     def init_q(self):
         q = {}
@@ -102,7 +108,7 @@ class QLearning():
 
     def calculate_q(self, state, action):
         # Q(state, action) = R(state, action) + Gamma * Max[Q(next state, all actions)]
-        return self.R[state.pos_y][state.pos_x] + self.Gamma * self.get_max_q(action)
+        return self.R[state.pos_y][state.pos_x] + self.GAMMA * self.get_max_q(action)
 
     def get_max_q(self, next_state):
         allowed = self.Q[next_state].items()
@@ -112,9 +118,6 @@ class QLearning():
                 max_v = allowed_state[1]
         return max_v
 
-    def default_state(self):
-        return State(0, 8)
-
     def update_q(self, state, action, alpha, increment):
         self.Q[state][action] *= 1 - alpha
         self.Q[state][action] += alpha * increment
@@ -122,10 +125,10 @@ class QLearning():
     def training(self):
         # init state
         state = self.default_state()
-        count = 1
+        count = 0
         alpha = 1
         tick = 1
-        while count < self.Epochs:
+        while count < self.EPOCHS:
 
             # print("%d : %d" % (state.pos_x, state.pos_y))
 
@@ -133,18 +136,20 @@ class QLearning():
 
             max_q = self.calculate_q(state, action)
 
-            self.score -= self.walk_reward
+            # is it correct?
+            self.score -= self.WALK_REWARDS
 
-            self.update_q(state, action, alpha, max_q + self.score)
+            self.update_q(state, action, alpha, max_q)
 
             self.show_progress(state, action)
 
             if self.is_game_failed(action):
-                # print("Failed")
                 state = self.default_state()
+                self.failures += 1
             elif self.is_game_won(action):
                 # goal completed, start next epoch
                 count += 1
+                self.success += 1
                 state = self.default_state()
                 print("Success")
             else:
@@ -172,6 +177,7 @@ class QLearning():
                     print('\033[1;32;40m%6d' % self.R[i][j], end='')
             print()
         print()
+        print("Success: %d, Failures: %d" % (self.success, self.failures))
         time.sleep(0.1)
 
 
