@@ -3,9 +3,10 @@ from __future__ import print_function
 import random
 import time
 import os
+import matplotlib.pyplot as plt
 
 
-class State():
+class State:
     def __init__(self, pos_x=0, pos_y=0, action=''):
         self.pos_x = pos_x
         self.pos_y = pos_y
@@ -36,7 +37,7 @@ class State():
         return "(%d, %d) - %s" % (self.pos_x, self.pos_y, self.action)
 
 
-class QLearning():
+class QLearning:
     def __init__(self):
         self.GAMMA = .8
         self.EPSILON = 0.2
@@ -45,14 +46,13 @@ class QLearning():
         self.ALPHA = 0.1
         self.FRAME_RATE = 0.15
         self.Q = {}
-        self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IN RANGE -0.3 .. 0 !!!
+        self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
 
-        self.score = 0
         self.success = 0
         self.failures = 0
+        self.statistics = {'Q': [], 'rewards': [], 'iter': []}
 
-        # Rewards matrix
-        self.R = [
+        self.ROOM = [
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
@@ -64,8 +64,8 @@ class QLearning():
             [0, 0, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, 0, 100]
         ]
 
-        self.HEIGHT = len(self.R)
-        self.WIDTH = len(self.R[0])
+        self.HEIGHT = len(self.ROOM)
+        self.WIDTH = len(self.ROOM[0])
 
         self.init_q()
 
@@ -79,27 +79,27 @@ class QLearning():
                     temp[action()] = self.INIT_Q_VALUE
                 self.Q[state] = temp
 
-    def is_moveable_to_the_left(self, state):
+    def is_movable_to_the_left(self, state):
         return state.pos_x > 0
 
-    def is_moveable_to_the_right(self, state):
+    def is_movable_to_the_right(self, state):
         return state.pos_x < self.WIDTH - 1
 
-    def is_moveable_to_the_top(self, state):
+    def is_movable_to_the_top(self, state):
         return state.pos_y > 0
 
-    def is_moveable_to_the_bottom(self, state):
+    def is_movable_to_the_bottom(self, state):
         return state.pos_y < self.HEIGHT - 1
 
     def get_allowed_actions(self, state):
         allowed = []
-        if self.is_moveable_to_the_left(state):
+        if self.is_movable_to_the_left(state):
             allowed.append(state.move_left)
-        if self.is_moveable_to_the_right(state):
+        if self.is_movable_to_the_right(state):
             allowed.append(state.move_right)
-        if self.is_moveable_to_the_top(state):
+        if self.is_movable_to_the_top(state):
             allowed.append(state.move_top)
-        if self.is_moveable_to_the_bottom(state):
+        if self.is_movable_to_the_bottom(state):
             allowed.append(state.move_bottom)
         return allowed
 
@@ -119,7 +119,7 @@ class QLearning():
 
     def get_max_q(self, next_state):
         allowed = self.Q[next_state].items()
-        max_v = -1
+        max_v = -1000
         for allowed_state in allowed:
             if allowed_state[1] > max_v:
                 max_v = allowed_state[1]
@@ -154,7 +154,9 @@ class QLearning():
             else:
                 next_action = action
 
-            self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
+            updated_q = self.get_updated_q(old_state, old_action, alpha, reward, action)
+
+            self.Q[old_state][old_action] = updated_q
 
             state, action = self.next_move(next_action)
 
@@ -162,29 +164,33 @@ class QLearning():
             alpha = pow(tick, -0.1)
             tick += 1
 
+            self.statistics["Q"].append(updated_q)
+            self.statistics["rewards"].append(reward)
+            self.statistics["iter"].append(tick)
+
     def get_updated_q(self, state, action, alpha, r, next_state):
         #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
         return self.Q[state][action] + alpha * (r + self.GAMMA * self.get_max_q(next_state) - self.Q[state][action])
 
     def is_game_failed(self, action):
-        return self.R[action.pos_y][action.pos_x] == -100
+        return self.ROOM[action.pos_y][action.pos_x] == -100
 
     def is_game_won(self, action):
-        return self.R[action.pos_y][action.pos_x] == 100
+        return self.ROOM[action.pos_y][action.pos_x] == 100
 
     def normalize_q(self):
         pass
 
-    def show_progress(self, state, new_action):
+    def show_progress(self, state, action):
         os.system('cls' if os.name == 'nt' else 'clear')
         for i in xrange(self.HEIGHT):
             for j in xrange(self.WIDTH):
-                if new_action.pos_x == j and new_action.pos_y == i:
-                    print('\033[0;31;40m%6.2f' % self.Q[state][new_action], end='')
+                if action.pos_x == j and action.pos_y == i:
+                    print('\033[0;31;40m%6.2f' % self.Q[state][action], end='')
                 else:
-                    if self.R[i][j] == -100:
+                    if self.ROOM[i][j] == -100:
                         print('\033[1;32;40m%6s' % "x", end='')
-                    elif self.R[i][j] == 100:
+                    elif self.ROOM[i][j] == 100:
                         print('\033[1;32;40m%6s' % "[]", end='')
                     else:
                         print('\033[1;32;40m%6s' % ".", end='')
@@ -205,6 +211,16 @@ class QLearning():
             state = next_state
             steps += 1
 
+    def show_graph(self):
+        plt.subplot(211)
+        plt.plot(self.statistics["iter"], self.statistics["Q"], lw=1)
+        plt.title('Iter/Q')
+
+        plt.subplot(212)
+        plt.plot(self.statistics["iter"], self.statistics["rewards"], lw=1)
+        plt.title('Iter/Rewards')
+        plt.show()
+
 
 def run():
     q_learning = QLearning()
@@ -214,6 +230,8 @@ def run():
     q_learning.training(s)
 
     q_learning.show_final_result(s)
+
+    q_learning.show_graph()
 
 
 if __name__ == '__main__':

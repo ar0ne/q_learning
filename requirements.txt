@@ -1,0 +1,7 @@
+matplotlib
+numpy
+
+# NOTES:
+
+# matplotlib requires a backend (see matplotlibrc), tkagg is one option:
+#$ sudo apt-get install tcl-dev tk-dev python-tk python3-tk
