@@ -38,20 +38,18 @@ class State():
 
 class QLearning():
     def __init__(self):
-        self.WALK_REWARDS = -0.04
-        self.GAMMA = .9
+        self.GAMMA = .8
         self.EPSILON = 0.2
-        self.EPOCHS = 1000
+        self.EPOCHS = 100
         self.INIT_Q_VALUE = 0  # in most cases should be zero
         self.ALPHA = 0.1
-        self.FRAME_RATE = 0.1
+        self.FRAME_RATE = 0.15
         self.Q = {}
+        self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IN RANGE -0.3 .. 0 !!!
 
         self.score = 0
         self.success = 0
         self.failures = 0
-
-        self.start_state = State(0, 0)
 
         # Rewards matrix
         self.R = [
@@ -68,6 +66,8 @@ class QLearning():
 
         self.HEIGHT = len(self.R)
         self.WIDTH = len(self.R[0])
+
+        self.init_q()
 
     def init_q(self):
         for x in xrange(self.WIDTH):
@@ -119,58 +119,51 @@ class QLearning():
 
     def get_max_q(self, next_state):
         allowed = self.Q[next_state].items()
-        max_v = -10000
+        max_v = -1
         for allowed_state in allowed:
             if allowed_state[1] > max_v:
                 max_v = allowed_state[1]
         return max_v
 
-    def restart_game(self):
-        return self.start_state, self.choose_next_action(self.start_state)
+    def next_move(self, state):
+        return state, self.choose_next_action(state)
 
-    def training(self):
+    def training(self, start_state=State()):
         count = 0
         tick = 1
         alpha = 1
-        state, action = self.restart_game()
+        state, action = self.next_move(start_state)
         while count < self.EPOCHS:
 
-            reward = -0.1
+            reward = self.WALK_REWARDS
+
+            # self.show_progress(state, action)
 
             old_state = state
             old_action = action
 
-            # self.show_progress(state, action)
-
-            # get rewards for the last action
             if self.is_game_failed(action):
                 self.failures += 1
                 reward = -100
-                self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
-                    reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
-                state, action = self.restart_game()
-                continue
+                self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
+                state, action = self.next_move(start_state)
             elif self.is_game_won(action):
                 count += 1
                 self.success += 1
                 reward = 100
-                self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
-                    reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
-                state, action = self.restart_game()
-                continue
-
-            # update Q
-            # Q[old_state][old_action] = Q[old_state][old_action] + alpha * (reward + Gamma * MAX_Q(new_state) - Q[old_state][old_action])
-            self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
-            reward + self.GAMMA * self.get_max_q(action) - self.Q[old_state][old_action])
-
-            state = action
-
-            action = self.choose_next_action(state)
+                self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
+                state, action = self.next_move(start_state)
+            else:
+                self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
+                state, action = self.next_move(action)
 
             # Update the learning rate
             alpha = pow(tick, -0.1)
             tick += 1
+
+    def get_updated_q(self, state, action, alpha, r, next_state):
+        #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
+        return self.Q[state][action] + alpha * (r + self.GAMMA * self.get_max_q(next_state) - self.Q[state][action])
 
     def is_game_failed(self, action):
         return self.R[action.pos_y][action.pos_x] == -100
@@ -200,8 +193,7 @@ class QLearning():
         # [print("%2.2f -- %s" % (i[1], i[0])) for i in self.Q[state].items()]
         time.sleep(self.FRAME_RATE)
 
-    def show_final_result(self):
-        state = self.start_state
+    def show_final_result(self, state):
         steps = 0
         while True:
             next_state = self.choose_next_action(state, False)
@@ -215,9 +207,13 @@ class QLearning():
 
 def run():
     q_learning = QLearning()
-    q_learning.init_q()
-    q_learning.training()
-    q_learning.show_final_result()
+
+    s = State(0, 8)
+
+    q_learning.training(s)
+
+    q_learning.show_final_result(s)
+
 
 if __name__ == '__main__':
     run()
