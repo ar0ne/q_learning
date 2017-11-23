@@ -143,19 +143,20 @@ class QLearning():
             old_action = action
 
             if self.is_game_failed(action):
-                self.failures += 1
                 reward = -100
-                self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
-                state, action = self.next_move(start_state)
+                self.failures += 1
+                next_action = start_state
             elif self.is_game_won(action):
-                count += 1
-                self.success += 1
                 reward = 100
-                self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
-                state, action = self.next_move(start_state)
+                self.success += 1
+                count += 1
+                next_action = start_state
             else:
-                self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
-                state, action = self.next_move(action)
+                next_action = action
+
+            self.Q[old_state][old_action] = self.get_updated_q(old_state, old_action, alpha, reward, action)
+
+            state, action = self.next_move(next_action)
 
             # Update the learning rate
             alpha = pow(tick, -0.1)
