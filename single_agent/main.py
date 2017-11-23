@@ -12,16 +12,16 @@ class State():
         self.action = action
 
     def move_left(self):
-        return State(self.pos_x, self.pos_y - 1, 'left')
+        return State(self.pos_x - 1, self.pos_y, 'left')
 
     def move_right(self):
-        return State(self.pos_x, self.pos_y + 1, 'right')
+        return State(self.pos_x + 1, self.pos_y, 'right')
 
     def move_top(self):
-        return State(self.pos_x - 1, self.pos_y, 'top')
+        return State(self.pos_x, self.pos_y - 1, 'top')
 
     def move_bottom(self):
-        return State(self.pos_x + 1, self.pos_y, 'bottom')
+        return State(self.pos_x, self.pos_y + 1, 'bottom')
 
     def __hash__(self):
         return hash((self.pos_x, self.pos_y))
@@ -41,16 +41,30 @@ class QLearning():
         # self.WIDTH = 16
         # self.HEIGHT = 9
         self.WALK_REWARDS = -0.04
-        self.GAMMA = .8
-        self.EPSILON = 0.1
-        self.EPOCHS = 100
+        self.GAMMA = .9
+        self.EPSILON = 0.2
+        self.EPOCHS = 10
         self.INIT_Q_VALUE = 0  # in most cases should be zero
         self.ALPHA = 0.1
 
-        self.FRAME_RATE = 0.2
+        self.FRAME_RATE = 0.05
 
-        self.WIDTH = 8
-        self.HEIGHT = 9
+        self.R = [
+            [-1, -100, -1, -1, -1, -1, -100, -1],
+            [-1, -100, -1, -1, -1, -1, -100, -1],
+            [-1, -100, -1, -1, -1, -1, -100, -1],
+            [-1, -100, -1, -1, -1, -1, -100, -1],
+            [-1, -100, -1, -1, -1, -1, -1, -1],
+            [-1, -100, -1, -1, -1, -1, -1, -1],
+            [-1, -100, -1, -1, -1, -1, -1, -1],
+            [-1, -100, -1, -1, -1, -1, -1, 100],
+            [-1, -1, -1, -100, -100, -100, -100, -100]
+        ]
+
+
+
+        self.WIDTH = len(self.R[0])
+        self.HEIGHT = len(self.R)
 
         # self.R = [
         #     [0, 0, 0, 0, 0, 0, -100, 0],
@@ -64,27 +78,16 @@ class QLearning():
         #     [0, 0, -100, -100, -100, -100, -100, -100]
         # ]
 
-        self.R = [
-            [-1,-1,-1,-1,-1,-1, -100,-1],
-            [-1,-1,-1,-1,-1,-1, -100,-1],
-            [-1,-1,-1,-1,-1,-1, -100,-1],
-            [-1,-1,-1,-1,-1,-1, -100,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1,-1],
-            [-1,-1,-1,-1,-1,-1,-1, 100],
-            [-1,-1, -100, -100, -100, -100, -100, -100]
-        ]
+
 
         self.score = 0
         self.success = 0
         self.failures = 0
 
-        self.start_state = State(0, 8)
+        self.start_state = State(0, 0)
         self.end_state = State(7, 7)
 
-        # Init Q matrix
-        self.Q = self.init_q()
+        self.Q = {}
 
         # Rewards matrix
         # self.R = [
@@ -102,7 +105,6 @@ class QLearning():
 
 
     def init_q(self):
-        q = {}
         for x in xrange(self.WIDTH):
             for y in xrange(self.HEIGHT):
                 state = State(x, y)
@@ -110,20 +112,19 @@ class QLearning():
                 temp = {}
                 for action in actions:
                     temp[action()] = self.INIT_Q_VALUE
-                q[state] = temp
-        return q
+                self.Q[state] = temp
 
     def is_moveable_to_the_left(self, state):
-        return state.pos_y > 0
-
-    def is_moveable_to_the_right(self, state):
-        return state.pos_y < self.HEIGHT - 1
-
-    def is_moveable_to_the_top(self, state):
         return state.pos_x > 0
 
-    def is_moveable_to_the_bottom(self, state):
+    def is_moveable_to_the_right(self, state):
         return state.pos_x < self.WIDTH - 1
+
+    def is_moveable_to_the_top(self, state):
+        return state.pos_y > 0
+
+    def is_moveable_to_the_bottom(self, state):
+        return state.pos_y < self.HEIGHT - 1
 
     def get_allowed_actions(self, state):
         allowed = []
@@ -159,53 +160,58 @@ class QLearning():
                 max_v = allowed_state[1]
         return max_v
 
-    def learn(self, state, next_state, reward):
-        max_q = self.get_max_q(next_state)
-        self.learnQ(state, next_state, reward, reward + self.GAMMA * max_q)
-
-    def learnQ(self, state, action, reward, value):
-        old_q_value = self.Q[state][action]
-        self.Q[state][action] = old_q_value + self.ALPHA * (value - old_q_value)
+    def restart_game(self):
+        return self.start_state, self.choose_next_action(self.start_state)
 
     def training(self):
-        # init state
-        state = self.start_state
-
         count = 0
-        reward = 0
+        tick = 1
+        alpha = 1
+        state, action = self.restart_game()
         while count < self.EPOCHS:
 
-            next_state = self.choose_next_action(state)
+            reward = -0.1
 
-            # self.show_progress(state, next_state)
+            old_state = state
+            old_action = action
 
-            if self.is_game_failed(next_state):
+            # self.show_progress(state, action)
+
+            # get rewards for the last action
+            if self.is_game_failed(action):
                 self.failures += 1
                 reward = -100
-                self.learn(state, next_state, reward)
-                state = self.start_state
+                self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
+                reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
+                state, action = self.restart_game()
                 continue
-
-            elif self.is_game_won(next_state):
-                # goal completed, start next epoch
+            elif self.is_game_won(action):
                 count += 1
                 self.success += 1
-                reward = 50
-                self.learn(state, next_state, reward)
-                state = self.start_state
+                reward = 100
+                self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
+                reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
+                state, action = self.restart_game()
                 continue
 
-            self.learn(state, next_state, reward)
-            state = next_state
+            # update Q
+            # Q[old_state][old_action] = Q[old_state][old_action] + alpha * (reward + Gamma * MAX_Q(new_state) - Q[old_state][old_action])
+            self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
+
+            state = action
+
+            action = self.choose_next_action(state)
 
             # Update the learning rate
-            # alpha = pow(tick, -0.1)
+            alpha = pow(tick, -0.1)
+            tick += 1
+
 
     def is_game_failed(self, action):
         return self.R[action.pos_y][action.pos_x] == -100
 
     def is_game_won(self, action):
-        return action.pos_x == self.end_state.pos_x and action.pos_y == self.end_state.pos_y
+        return self.R[action.pos_y][action.pos_x] == 100
 
     def normalize_q(self):
         pass
@@ -244,8 +250,8 @@ class QLearning():
 
 def run():
     q_learning = QLearning()
+    q_learning.init_q()
     q_learning.training()
-    print("Success: %d, Failures: %d" % (q_learning.success, q_learning.failures))
     # q_learning.normalize_q()
     q_learning.show_final_result()
     # q_learning.print_q(q_learning.Q)
