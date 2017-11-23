@@ -38,71 +38,36 @@ class State():
 
 class QLearning():
     def __init__(self):
-        # self.WIDTH = 16
-        # self.HEIGHT = 9
         self.WALK_REWARDS = -0.04
         self.GAMMA = .9
         self.EPSILON = 0.2
-        self.EPOCHS = 10
+        self.EPOCHS = 1000
         self.INIT_Q_VALUE = 0  # in most cases should be zero
         self.ALPHA = 0.1
-
-        self.FRAME_RATE = 0.05
-
-        self.R = [
-            [-1, -100, -1, -1, -1, -1, -100, -1],
-            [-1, -100, -1, -1, -1, -1, -100, -1],
-            [-1, -100, -1, -1, -1, -1, -100, -1],
-            [-1, -100, -1, -1, -1, -1, -100, -1],
-            [-1, -100, -1, -1, -1, -1, -1, -1],
-            [-1, -100, -1, -1, -1, -1, -1, -1],
-            [-1, -100, -1, -1, -1, -1, -1, -1],
-            [-1, -100, -1, -1, -1, -1, -1, 100],
-            [-1, -1, -1, -100, -100, -100, -100, -100]
-        ]
-
-
-
-        self.WIDTH = len(self.R[0])
-        self.HEIGHT = len(self.R)
-
-        # self.R = [
-        #     [0, 0, 0, 0, 0, 0, -100, 0],
-        #     [0, 0, 0, 0, 0, 0, -100, 0],
-        #     [0, 0, 0, 0, 0, 0, -100, 0],
-        #     [0, 0, 0, 0, 0, 0, -100, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 100],
-        #     [0, 0, -100, -100, -100, -100, -100, -100]
-        # ]
-
-
+        self.FRAME_RATE = 0.1
+        self.Q = {}
 
         self.score = 0
         self.success = 0
         self.failures = 0
 
         self.start_state = State(0, 0)
-        self.end_state = State(7, 7)
-
-        self.Q = {}
 
         # Rewards matrix
-        # self.R = [
-        #     [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
-        #     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
-        #     [0, 0, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, 0, 100]
-        # ]
+        self.R = [
+            [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
+            [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
+            [0, 0, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, -100, 0, 100]
+        ]
 
-
+        self.HEIGHT = len(self.R)
+        self.WIDTH = len(self.R[0])
 
     def init_q(self):
         for x in xrange(self.WIDTH):
@@ -182,7 +147,7 @@ class QLearning():
                 self.failures += 1
                 reward = -100
                 self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
-                reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
+                    reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
                 state, action = self.restart_game()
                 continue
             elif self.is_game_won(action):
@@ -190,13 +155,14 @@ class QLearning():
                 self.success += 1
                 reward = 100
                 self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
-                reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
+                    reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
                 state, action = self.restart_game()
                 continue
 
             # update Q
             # Q[old_state][old_action] = Q[old_state][old_action] + alpha * (reward + Gamma * MAX_Q(new_state) - Q[old_state][old_action])
-            self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (reward + self.GAMMA * self.get_max_q(state) - self.Q[old_state][old_action])
+            self.Q[old_state][old_action] = self.Q[old_state][old_action] + alpha * (
+            reward + self.GAMMA * self.get_max_q(action) - self.Q[old_state][old_action])
 
             state = action
 
@@ -205,7 +171,6 @@ class QLearning():
             # Update the learning rate
             alpha = pow(tick, -0.1)
             tick += 1
-
 
     def is_game_failed(self, action):
         return self.R[action.pos_y][action.pos_x] == -100
@@ -231,10 +196,9 @@ class QLearning():
                         print('\033[1;32;40m%6s' % ".", end='')
             print()
         print()
-        print("Success: %d, Failures: %d" % (self.success, self.failures))
-        [print("%2.2f -- %s" % (i[1], i[0])) for i in self.Q[state].items()]
+        print("\033[1;32;40mSuccess: %d, Failures: %d" % (self.success, self.failures))
+        # [print("%2.2f -- %s" % (i[1], i[0])) for i in self.Q[state].items()]
         time.sleep(self.FRAME_RATE)
-
 
     def show_final_result(self):
         state = self.start_state
@@ -248,14 +212,12 @@ class QLearning():
             state = next_state
             steps += 1
 
+
 def run():
     q_learning = QLearning()
     q_learning.init_q()
     q_learning.training()
-    # q_learning.normalize_q()
     q_learning.show_final_result()
-    # q_learning.print_q(q_learning.Q)
-
 
 if __name__ == '__main__':
     run()
