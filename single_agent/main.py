@@ -178,9 +178,6 @@ class QLearning:
     def is_game_won(self, action):
         return self.ROOM[action.pos_y][action.pos_x] == 100
 
-    def normalize_q(self):
-        pass
-
     def show_progress(self, state, action):
         os.system('cls' if os.name == 'nt' else 'clear')
         for i in xrange(self.HEIGHT):
