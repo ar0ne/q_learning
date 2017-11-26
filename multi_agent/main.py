@@ -3,6 +3,7 @@ from __future__ import print_function
 import random
 import time
 import os
+import time
 
 
 class State:
@@ -116,7 +117,8 @@ class QLearning:
         return agent.y < self.HEIGHT - agent.shift
 
     def get_allowed_actions(self, state):
-        allowed = [state.move_none]
+        # allowed = [state.move_none]
+        allowed = []
         if self.is_movable_to_the_left(state):
             allowed.append(state.move_left)
         if self.is_movable_to_the_right(state):
@@ -127,13 +129,13 @@ class QLearning:
             allowed.append(state.move_bottom)
         return allowed
 
-    def add_agent1(self, actor):
+    def add_agent1(self, actor, max_shift):
         self.agent1 = actor
-        self.q1 = self.init_q(actor.shift)
 
-    def add_agent2(self, actor):
+
+    def add_agent2(self, actor, max_shift):
         self.agent2 = actor
-        self.q2 = self.init_q(actor.shift)
+        self.q2 = self.init_q(max_shift)
 
     def choose_next_action(self, agent_a, agent_b, agent_a_Q, randomly=True):
         allowed = agent_a_Q[agent_a][agent_b].items()
@@ -161,18 +163,20 @@ class QLearning:
         #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
         return Q[st1][st2][action] + alpha * (r + self.GAMMA * self.get_max_q(Q, next_st1, next_st2) - Q[st1][st2][action])
 
-    def is_game_failed(self, state):
-        return self.ROOM[state.y][state.x] == -100
+    def is_game_failed(self, st1, st2):
+        if self.ROOM[st1.y][st1.x] == -100 or self.ROOM[st2.y][st2.x]:
+            return True
+        return (pow(st1.x - st2.x, 2) + pow(st1.y - st2.y, 2)) ** .5 > 3
 
-    def is_game_won(self, state):
-        return self.ROOM[state.y][state.x] == 100
+    def is_game_won(self, st1, st2):
+        return self.ROOM[st1.y][st1.x] == 100 or self.ROOM[st2.y][st2.x] == 100
 
-    def training(self):
+    def training(self, start_st1, start_st2):
         count = 0
         tick = 1
         alpha = 1
-        st1 = self.agent1
-        st2 = self.agent2
+        st1 = start_st1
+        st2 = start_st2
         st1_action = self.choose_next_action(st1, st2, self.q1)
         st2_action = self.choose_next_action(st2, st1, self.q2)
 
@@ -180,24 +184,24 @@ class QLearning:
 
             reward = self.WALK_REWARDS
 
-            # self.show_progress(state, action)
+            # self.show_progress(st1, st2, st1_action, st2_action, self.q1, self.q2)
 
             old_st1 = st1
             old_st2 = st2
             old_st1_action = st1_action
             old_st2_action = st2_action
 
-            if self.is_game_failed(st1_action) or self.is_game_failed(st2_action):
+            if self.is_game_failed(st1_action, st2_action):
                 reward = -100
                 self.failures += 1
-                next_st1_action = self.agent1
-                next_st2_action = self.agent2
-            elif self.is_game_won(st1_action) or self.is_game_won(st2_action):
+                next_st1_action = start_st1
+                next_st2_action = start_st2
+            elif self.is_game_won(st1_action, st2_action):
                 reward = 100
                 self.success += 1
                 count += 1
-                next_st1_action = self.agent1
-                next_st2_action = self.agent2
+                next_st1_action = start_st1
+                next_st2_action = start_st2
             else:
                 next_st1_action = st1_action
                 next_st2_action = st2_action
@@ -209,28 +213,66 @@ class QLearning:
             self.q1[old_st2][old_st1][old_st2_action] = st2_updated_q
 
             st1 = next_st1_action
-            st1_action = self.choose_next_action(st1, st2, self.q1)
-
             st2 = next_st2_action
-            st2_action = self.choose_next_action(st2, st1, self.q2)
 
+            st1_action = self.choose_next_action(st1, st2, self.q1)
+            st2_action = self.choose_next_action(st2, st1, self.q2)
 
             # Update the learning rate
             alpha = pow(tick, -0.1)
             tick += 1
 
+    def show_progress(self, st1, st2, st1_action, st2_action, q1, q2):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        for i in xrange(self.HEIGHT):
+            for j in xrange(self.WIDTH):
+                if st1_action.x == j and st1_action.y == i:
+                    print('\033[0;34;40m%6.2f' % q1[st1][st2][st1_action], end='')
+                elif st2_action.x == j and st2_action.y == i:
+                    print('\033[0;33;40m%6.2f' % q2[st2][st1][st2_action], end='')
+                else:
+                    if self.ROOM[i][j] == -100:
+                        print('\033[1;31;40m%6s' % "x", end='')
+                    elif self.ROOM[i][j] == 100:
+                        print('\033[1;32;40m%6s' % "[]", end='')
+                    else:
+                        print('\033[1;32;40m%6s' % ".", end='')
+            print()
+        print()
+        print("\033[1;32;40mSuccess: %d, Failures: %d" % (self.success, self.failures))
+        # [print("%2.2f -- %s" % (i[1], i[0])) for i in self.Q[state].items()]
+        time.sleep(self.FRAME_RATE)
+
+    def show_final_result(self, st1, st2, q1, q2):
+        steps = 0
+        while True:
+            next_st1 = self.choose_next_action(st1, st2, q1, False)
+            next_st2 = self.choose_next_action(st2, st1, q2, False)
+            self.show_progress(st1, st2, next_st1, next_st2, self.q1, self.q2)
+            if self.is_game_won(next_st1, next_st2):
+                print("Steps: %d" % steps)
+                break
+            st1 = next_st1
+            st2 = next_st2
+            steps += 1
 
 
 def run():
+    q_learn = QLearning()
+
     agent1 = State(0, 8, shift=1)
     agent2 = State(1, 8, shift=2)
 
-    q_learn = QLearning()
+    max_shift = max(agent1.shift, agent2.shift)
+    q_learn.q1 = q_learn.init_q(max_shift)
+    q_learn.q2 = q_learn.init_q(max_shift)
 
-    q_learn.add_agent1(agent1)
-    q_learn.add_agent2(agent2)
+    start_time = time.time()
+    q_learn.training(agent1, agent2)
+    print("--- %s seconds ---" % (time.time() - start_time))
+    input("show final result")
 
-    q_learn.training()
+    q_learn.show_final_result(agent1, agent2, q_learn.q1, q_learn.q2)
 
 
 if __name__ == '__main__':
