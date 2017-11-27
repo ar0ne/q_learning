@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import random
-import time
 import os
 import time
+
+
+def timer(fn):
+    def wrapped(*args, **kwargs):
+        start_time = time.time()
+        fn(*args, **kwargs)
+        print("--- %s seconds ---" % (time.time() - start_time))
+    return wrapped
 
 
 class State:
@@ -45,16 +52,14 @@ class QLearning:
     def __init__(self):
         self.GAMMA = .8
         self.EPSILON = 0.2
-        self.EPOCHS = 100
+        self.EPOCHS = 200
         self.INIT_Q_VALUE = 0  # in most cases should be zero
         self.ALPHA = 0.1
-        self.FRAME_RATE = 0.15
+        self.FRAME_RATE = 0.05
         self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
 
         self.success = 0
         self.failures = 0
-
-        # self.actors = []
 
         self.ROOM = [
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -84,7 +89,7 @@ class QLearning:
                 agent1_state = State(x, y, shift=shift)
                 agent1_allowed_actions = self.get_allowed_actions(agent1_state)
                 Q[agent1_state] = {}
-                agent2_possible_states = self.get_possible_states_of_partner(agent1_state)
+                agent2_possible_states = self.get_possible_states_of_partner(agent1_state, limit=shift)
                 for agent2_state in agent2_possible_states:
                     temp = {}
                     for action in agent1_allowed_actions:
@@ -117,8 +122,8 @@ class QLearning:
         return agent.y < self.HEIGHT - agent.shift
 
     def get_allowed_actions(self, state):
-        # allowed = [state.move_none]
         allowed = []
+        # allowed = [state.move_none]
         if self.is_movable_to_the_left(state):
             allowed.append(state.move_left)
         if self.is_movable_to_the_right(state):
@@ -128,14 +133,6 @@ class QLearning:
         if self.is_movable_to_the_bottom(state):
             allowed.append(state.move_bottom)
         return allowed
-
-    def add_agent1(self, actor, max_shift):
-        self.agent1 = actor
-
-
-    def add_agent2(self, actor, max_shift):
-        self.agent2 = actor
-        self.q2 = self.init_q(max_shift)
 
     def choose_next_action(self, agent_a, agent_b, agent_a_Q, randomly=True):
         allowed = agent_a_Q[agent_a][agent_b].items()
@@ -171,6 +168,7 @@ class QLearning:
     def is_game_won(self, st1, st2):
         return self.ROOM[st1.y][st1.x] == 100 or self.ROOM[st2.y][st2.x] == 100
 
+    @timer
     def training(self, start_st1, start_st2):
         count = 0
         tick = 1
@@ -263,14 +261,13 @@ def run():
     agent1 = State(0, 8, shift=1)
     agent2 = State(1, 8, shift=2)
 
-    max_shift = max(agent1.shift, agent2.shift)
+    max_shift = max(agent1.shift, agent2.shift) + 3
     q_learn.q1 = q_learn.init_q(max_shift)
     q_learn.q2 = q_learn.init_q(max_shift)
 
-    start_time = time.time()
     q_learn.training(agent1, agent2)
-    print("--- %s seconds ---" % (time.time() - start_time))
-    input("show final result")
+
+    r = raw_input("show final result")
 
     q_learn.show_final_result(agent1, agent2, q_learn.q1, q_learn.q2)
 
