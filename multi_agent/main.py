@@ -3,13 +3,14 @@ from __future__ import print_function
 import random
 import os
 import time
+import sys
 
 
 def timer(fn):
     def wrapped(*args, **kwargs):
         start_time = time.time()
         fn(*args, **kwargs)
-        print("--- %s seconds ---" % (time.time() - start_time))
+        print("\n--- %s seconds ---" % (time.time() - start_time))
     return wrapped
 
 
@@ -21,16 +22,16 @@ class State:
         self.movement = movement
 
     def move_left(self):
-        return State(self.x - 1, self.y, 'left', shift=self.shift)
+        return State(self.x - self.shift, self.y, 'left', shift=self.shift)
 
     def move_right(self):
-        return State(self.x + 1, self.y, 'right', shift=self.shift)
+        return State(self.x + self.shift, self.y, 'right', shift=self.shift)
 
     def move_top(self):
-        return State(self.x, self.y - 1, 'top', shift=self.shift)
+        return State(self.x, self.y - self.shift, 'top', shift=self.shift)
 
     def move_bottom(self):
-        return State(self.x, self.y + 1, 'bottom', shift=self.shift)
+        return State(self.x, self.y + self.shift, 'bottom', shift=self.shift)
 
     def move_none(self):
         return State(self.x, self.y, 'none', shift=self.shift)
@@ -50,12 +51,11 @@ class State:
 
 class QLearning:
     def __init__(self):
-        self.GAMMA = .8
+        self.GAMMA = .9
         self.EPSILON = 0.2
-        self.EPOCHS = 200
+        self.EPOCHS = 1000
         self.INIT_Q_VALUE = 0  # in most cases should be zero
-        self.ALPHA = 0.1
-        self.FRAME_RATE = 0.05
+        self.FRAME_RATE = 0.15
         self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
 
         self.success = 0
@@ -63,7 +63,7 @@ class QLearning:
 
         self.ROOM = [
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 100, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, -100, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, 0],
@@ -82,14 +82,14 @@ class QLearning:
         self.agent1 = None
         self.agent2 = None
 
-    def init_q(self, shift):
+    def init_q(self, shift, max_shift):
         Q = {}
         for x in xrange(self.WIDTH):
             for y in xrange(self.HEIGHT):
                 agent1_state = State(x, y, shift=shift)
                 agent1_allowed_actions = self.get_allowed_actions(agent1_state)
                 Q[agent1_state] = {}
-                agent2_possible_states = self.get_possible_states_of_partner(agent1_state, limit=shift)
+                agent2_possible_states = self.get_possible_states_of_partner(agent1_state, limit=max_shift)
                 for agent2_state in agent2_possible_states:
                     temp = {}
                     for action in agent1_allowed_actions:
@@ -110,20 +110,20 @@ class QLearning:
         return 0 <= state.x < self.WIDTH and 0 <= state.y < self.HEIGHT
 
     def is_movable_to_the_left(self, agent):
-        return agent.x > 0
+        return agent.x - agent.shift > 0
 
     def is_movable_to_the_right(self, agent):
-        return agent.x < self.WIDTH - agent.shift
+        return agent.x + agent.shift < self.WIDTH
 
     def is_movable_to_the_top(self, agent):
-        return agent.y > 0
+        return agent.y - agent.shift > 0
 
     def is_movable_to_the_bottom(self, agent):
-        return agent.y < self.HEIGHT - agent.shift
+        return agent.y + agent.shift < self.HEIGHT
 
     def get_allowed_actions(self, state):
         allowed = []
-        # allowed = [state.move_none]
+        allowed = [state.move_none]
         if self.is_movable_to_the_left(state):
             allowed.append(state.move_left)
         if self.is_movable_to_the_right(state):
@@ -156,8 +156,9 @@ class QLearning:
                 max_v = allowed_state[1]
         return max_v
 
-    def get_updated_q(self, st1, st2, Q, action, alpha, r, next_st1, next_st2):
+    def get_updated_q(self, Q, st1, st2, action, alpha, r, next_st1, next_st2):
         #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
+        # s' - old state
         return Q[st1][st2][action] + alpha * (r + self.GAMMA * self.get_max_q(Q, next_st1, next_st2) - Q[st1][st2][action])
 
     def is_game_failed(self, st1, st2):
@@ -182,7 +183,10 @@ class QLearning:
 
             reward = self.WALK_REWARDS
 
-            # self.show_progress(st1, st2, st1_action, st2_action, self.q1, self.q2)
+            self.show_statistics()
+
+            # if self.failures % 5000 == 0:
+            #     self.show_progress(st1, st2, st1_action, st2_action, self.q1, self.q2)
 
             old_st1 = st1
             old_st2 = st2
@@ -200,15 +204,19 @@ class QLearning:
                 count += 1
                 next_st1_action = start_st1
                 next_st2_action = start_st2
+            elif st1_action == st2_action:
+                reward = -0.05
+                next_st1_action = st1_action
+                next_st2_action = st2_action
             else:
                 next_st1_action = st1_action
                 next_st2_action = st2_action
 
-            st1_updated_q = self.get_updated_q(old_st1, old_st2, self.q1, st1_action, alpha, reward, st1, st2)
-            st2_updated_q = self.get_updated_q(old_st2, old_st1, self.q2, st2_action, alpha, reward, st2, st1)
+            st1_updated_q = self.get_updated_q(self.q1, old_st1, old_st2, old_st1_action, alpha, reward, st1_action, st2_action)
+            st2_updated_q = self.get_updated_q(self.q2, old_st2, old_st1, old_st2_action, alpha, reward, st2_action, st1_action)
 
             self.q1[old_st1][old_st2][old_st1_action] = st1_updated_q
-            self.q1[old_st2][old_st1][old_st2_action] = st2_updated_q
+            self.q2[old_st2][old_st1][old_st2_action] = st2_updated_q
 
             st1 = next_st1_action
             st2 = next_st2_action
@@ -217,7 +225,7 @@ class QLearning:
             st2_action = self.choose_next_action(st2, st1, self.q2)
 
             # Update the learning rate
-            alpha = pow(tick, -0.1)
+            alpha = pow(tick, -0.01)
             tick += 1
 
     def show_progress(self, st1, st2, st1_action, st2_action, q1, q2):
@@ -254,6 +262,14 @@ class QLearning:
             st2 = next_st2
             steps += 1
 
+    def update_progress(self, progress, maximum):
+        sys.stdout.write('\r%d' % (progress * 100. / maximum ))
+        sys.stdout.flush()
+
+    def show_statistics(self):
+        sys.stdout.write('\rSuccess: %d, Failures: %d' % (self.success, self.failures ))
+        sys.stdout.flush()
+
 
 def run():
     q_learn = QLearning()
@@ -261,9 +277,9 @@ def run():
     agent1 = State(0, 8, shift=1)
     agent2 = State(1, 8, shift=2)
 
-    max_shift = max(agent1.shift, agent2.shift) + 3
-    q_learn.q1 = q_learn.init_q(max_shift)
-    q_learn.q2 = q_learn.init_q(max_shift)
+    max_shift = max(agent1.shift, agent2.shift) + 4
+    q_learn.q1 = q_learn.init_q(agent1.shift, max_shift)
+    q_learn.q2 = q_learn.init_q(agent2.shift, max_shift)
 
     q_learn.training(agent1, agent2)
 
