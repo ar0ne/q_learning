@@ -61,6 +61,8 @@ class QLearning:
         self.success = 0
         self.failures = 0
 
+        self.Q = {}
+
         self.ROOM = [
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, -100, 0, 0, 0, 100, 0, 0, 0, 0, 0],
@@ -75,9 +77,6 @@ class QLearning:
 
         self.HEIGHT = len(self.ROOM)
         self.WIDTH = len(self.ROOM[0])
-
-        self.q1 = {}
-        self.q2 = {}
 
         self.agent1 = None
         self.agent2 = None
@@ -123,7 +122,7 @@ class QLearning:
 
     def get_allowed_actions(self, state):
         allowed = []
-        allowed = [state.move_none]
+        # allowed = [state.move_none]
         if self.is_movable_to_the_left(state):
             allowed.append(state.move_left)
         if self.is_movable_to_the_right(state):
@@ -134,8 +133,8 @@ class QLearning:
             allowed.append(state.move_bottom)
         return allowed
 
-    def choose_next_action(self, agent_a, agent_b, agent_a_Q, randomly=True):
-        allowed = agent_a_Q[agent_a][agent_b].items()
+    def choose_next_action(self, agent_a, agent_b, randomly=True):
+        allowed = self.Q[agent_a][agent_b].items()
         if randomly and random.random() < self.EPSILON:
             return random.choice(allowed)[0]
         else:
@@ -148,18 +147,18 @@ class QLearning:
             else:
                 return [a[0] for a in allowed if a[1] == max_q][0]
 
-    def get_max_q(self, Q, st1, st2):
-        allowed = Q[st1][st2].items()
+    def get_max_q(self, st1, st2):
+        allowed = self.Q[st1][st2].items()
         max_v = -1000
         for allowed_state in allowed:
             if allowed_state[1] > max_v:
                 max_v = allowed_state[1]
         return max_v
 
-    def get_updated_q(self, Q, st1, st2, action, alpha, r, next_st1, next_st2):
+    def get_updated_q(self, st1, st2, action, alpha, r, next_st1, next_st2):
         #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
         # s' - old state
-        return Q[st1][st2][action] + alpha * (r + self.GAMMA * self.get_max_q(Q, next_st1, next_st2) - Q[st1][st2][action])
+        return self.Q[st1][st2][action] + alpha * (r + self.GAMMA * self.get_max_q(next_st1, next_st2) - self.Q[st1][st2][action])
 
     def is_game_failed(self, st1, st2):
         if self.ROOM[st1.y][st1.x] == -100 or self.ROOM[st2.y][st2.x]:
@@ -176,8 +175,8 @@ class QLearning:
         alpha = 1
         st1 = start_st1
         st2 = start_st2
-        st1_action = self.choose_next_action(st1, st2, self.q1)
-        st2_action = self.choose_next_action(st2, st1, self.q2)
+        st1_action = self.choose_next_action(st1, st2)
+        st2_action = self.choose_next_action(st2, st1)
 
         while count < self.EPOCHS:
 
@@ -186,7 +185,7 @@ class QLearning:
             self.show_statistics()
 
             # if self.failures % 5000 == 0:
-            #     self.show_progress(st1, st2, st1_action, st2_action, self.q1, self.q2)
+            #     self.show_progress(st1, st2, st1_action, st2_action)
 
             old_st1 = st1
             old_st2 = st2
@@ -205,37 +204,37 @@ class QLearning:
                 next_st1_action = start_st1
                 next_st2_action = start_st2
             elif st1_action == st2_action:
-                reward = -0.05
+                reward = -0.2
                 next_st1_action = st1_action
                 next_st2_action = st2_action
             else:
                 next_st1_action = st1_action
                 next_st2_action = st2_action
 
-            st1_updated_q = self.get_updated_q(self.q1, old_st1, old_st2, old_st1_action, alpha, reward, st1_action, st2_action)
-            st2_updated_q = self.get_updated_q(self.q2, old_st2, old_st1, old_st2_action, alpha, reward, st2_action, st1_action)
+            st1_updated_q = self.get_updated_q(old_st1, old_st2, old_st1_action, alpha, reward, st1_action, st2_action)
+            st2_updated_q = self.get_updated_q(old_st2, old_st1, old_st2_action, alpha, reward, st2_action, st1_action)
 
-            self.q1[old_st1][old_st2][old_st1_action] = st1_updated_q
-            self.q2[old_st2][old_st1][old_st2_action] = st2_updated_q
+            self.Q[old_st1][old_st2][old_st1_action] = st1_updated_q
+            self.Q[old_st2][old_st1][old_st2_action] = st2_updated_q
 
             st1 = next_st1_action
             st2 = next_st2_action
 
-            st1_action = self.choose_next_action(st1, st2, self.q1)
-            st2_action = self.choose_next_action(st2, st1, self.q2)
+            st1_action = self.choose_next_action(st1, st2)
+            st2_action = self.choose_next_action(st2, st1)
 
             # Update the learning rate
             alpha = pow(tick, -0.01)
             tick += 1
 
-    def show_progress(self, st1, st2, st1_action, st2_action, q1, q2):
+    def show_progress(self, st1, st2, st1_action, st2_action):
         os.system('cls' if os.name == 'nt' else 'clear')
         for i in xrange(self.HEIGHT):
             for j in xrange(self.WIDTH):
                 if st1_action.x == j and st1_action.y == i:
-                    print('\033[0;34;40m%6.2f' % q1[st1][st2][st1_action], end='')
+                    print('\033[0;34;40m%6.2f' % self.Q[st1][st2][st1_action], end='')
                 elif st2_action.x == j and st2_action.y == i:
-                    print('\033[0;33;40m%6.2f' % q2[st2][st1][st2_action], end='')
+                    print('\033[0;33;40m%6.2f' % self.Q[st2][st1][st2_action], end='')
                 else:
                     if self.ROOM[i][j] == -100:
                         print('\033[1;31;40m%6s' % "x", end='')
@@ -249,12 +248,12 @@ class QLearning:
         # [print("%2.2f -- %s" % (i[1], i[0])) for i in self.Q[state].items()]
         time.sleep(self.FRAME_RATE)
 
-    def show_final_result(self, st1, st2, q1, q2):
+    def show_final_result(self, st1, st2):
         steps = 0
         while True:
-            next_st1 = self.choose_next_action(st1, st2, q1, False)
-            next_st2 = self.choose_next_action(st2, st1, q2, False)
-            self.show_progress(st1, st2, next_st1, next_st2, self.q1, self.q2)
+            next_st1 = self.choose_next_action(st1, st2, False)
+            next_st2 = self.choose_next_action(st2, st1, False)
+            self.show_progress(st1, st2, next_st1, next_st2)
             if self.is_game_won(next_st1, next_st2):
                 print("Steps: %d" % steps)
                 break
@@ -278,14 +277,13 @@ def run():
     agent2 = State(1, 8, shift=2)
 
     max_shift = max(agent1.shift, agent2.shift) + 4
-    q_learn.q1 = q_learn.init_q(agent1.shift, max_shift)
-    q_learn.q2 = q_learn.init_q(agent2.shift, max_shift)
+    q_learn.Q = q_learn.init_q(agent1.shift, max_shift)
 
     q_learn.training(agent1, agent2)
 
     r = raw_input("show final result")
 
-    q_learn.show_final_result(agent1, agent2, q_learn.q1, q_learn.q2)
+    q_learn.show_final_result(agent1, agent2)
 
 
 if __name__ == '__main__':
