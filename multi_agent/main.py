@@ -53,7 +53,7 @@ class QLearning:
     def __init__(self):
         self.GAMMA = .9
         self.EPSILON = 0.2
-        self.EPOCHS = 1000
+        self.EPOCHS = 10
         self.INIT_Q_VALUE = 0  # in most cases should be zero
         self.FRAME_RATE = 0.15
         self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
@@ -161,71 +161,85 @@ class QLearning:
         # s' - old state
         return Q[st1][st2][action] + alpha * (r + self.GAMMA * self.get_max_q(Q, next_st1, next_st2) - Q[st1][st2][action])
 
-    def is_game_failed(self, st1, st2):
-        if self.ROOM[st1.y][st1.x] == -100 or self.ROOM[st2.y][st2.x]:
-            return True
-        return (pow(st1.x - st2.x, 2) + pow(st1.y - st2.y, 2)) ** .5 > 3
+    def is_game_failed(self, state):
+        return self.ROOM[state.y][state.x] == -100
 
-    def is_game_won(self, st1, st2):
-        return self.ROOM[st1.y][st1.x] == 100 or self.ROOM[st2.y][st2.x] == 100
+    def is_agents_too_far_away(self, st1, st2):
+        return (pow(st1.x - st2.x, 2) + pow(st1.y - st2.y, 2)) ** .5 > 2.6
+
+    def is_game_won(self, state):
+        return self.ROOM[state.y][state.x] == 100
+
+    def get_rewards(self, act1, act2, old_st1, old_st2):
+        r1 = r2 = self.WALK_REWARDS
+        restart = False
+        if self.is_game_won(act1):
+            r1 = 100
+            restart = True
+            self.success += 1
+        if self.is_game_won(act2):
+            r2 = 100
+            restart = True
+            self.success += 1
+
+        if self.is_agents_too_far_away(act1, old_st2):
+            r1 = -100
+            restart = True
+            self.failures += 1
+        if self.is_agents_too_far_away(act2, old_st1):
+            r2 = -100
+            restart = True
+            self.failures += 1
+        if self.is_agents_too_far_away(act1, act2):
+            r1 = r2 = -100
+            restart = True
+            self.failures += 1
+
+        if self.is_game_failed(act1):
+            r1 = -100
+            restart = True
+            self.failures += 1
+        if self.is_game_failed(act2):
+            r2 = -100
+            restart = True
+            self.failures += 1
+
+        return r1, r2, restart
+
+    def next_actions(self, st1, st2):
+        return self.choose_next_action(st1, st2, self.q1), self.choose_next_action(st2, st1, self.q2)
 
     @timer
     def training(self, start_st1, start_st2):
-        count = 0
         tick = 1
         alpha = 1
-        st1 = start_st1
-        st2 = start_st2
-        st1_action = self.choose_next_action(st1, st2, self.q1)
-        st2_action = self.choose_next_action(st2, st1, self.q2)
-
-        while count < self.EPOCHS:
-
-            reward = self.WALK_REWARDS
+        st1, st2 = start_st1, start_st2
+        act1, act2 = self.next_actions(st1, st2)
+        while self.success < self.EPOCHS:
 
             self.show_statistics()
 
-            # if self.failures % 5000 == 0:
-            #     self.show_progress(st1, st2, st1_action, st2_action, self.q1, self.q2)
+            old_st1, old_st2 = st1, st2
+            old_act1, old_act2 = act1, act2
 
-            old_st1 = st1
-            old_st2 = st2
-            old_st1_action = st1_action
-            old_st2_action = st2_action
+            # self.show_progress(st1, st2, act1, act2, self.q1, self.q2)
 
-            if self.is_game_failed(st1_action, st2_action):
-                reward = -100
-                self.failures += 1
-                next_st1_action = start_st1
-                next_st2_action = start_st2
-            elif self.is_game_won(st1_action, st2_action):
-                reward = 100
-                self.success += 1
-                count += 1
-                next_st1_action = start_st1
-                next_st2_action = start_st2
-            elif st1_action == st2_action:
-                reward = -0.2
-                next_st1_action = st1_action
-                next_st2_action = st2_action
+            r1, r2, restart = self.get_rewards(act1, act2, st1, st2)
+
+            u1 = self.get_updated_q(self.q1, old_st1, old_st2, old_act1, alpha, r1, act1, act2)
+            u2 = self.get_updated_q(self.q2, old_st2, old_st1, old_act2, alpha, r2, act2, act1)
+
+            self.q1[old_st1][old_st2][old_act1] = u1
+            self.q2[old_st2][old_st1][old_act2] = u2
+
+            if restart:
+                st1, st2 = start_st1, start_st2
             else:
-                next_st1_action = st1_action
-                next_st2_action = st2_action
+                st1, st2 = act1, act2
 
-            st1_updated_q = self.get_updated_q(self.q1, old_st1, old_st2, old_st1_action, alpha, reward, st1_action, st2_action)
-            st2_updated_q = self.get_updated_q(self.q2, old_st2, old_st1, old_st2_action, alpha, reward, st2_action, st1_action)
+            act1, act2 = self.next_actions(st1, st2)
 
-            self.q1[old_st1][old_st2][old_st1_action] = st1_updated_q
-            self.q2[old_st2][old_st1][old_st2_action] = st2_updated_q
-
-            st1 = next_st1_action
-            st2 = next_st2_action
-
-            st1_action = self.choose_next_action(st1, st2, self.q1)
-            st2_action = self.choose_next_action(st2, st1, self.q2)
-
-            # Update the learning rate
-            alpha = pow(tick, -0.01)
+            alpha = pow(tick, -0.1)
             tick += 1
 
     def show_progress(self, st1, st2, st1_action, st2_action, q1, q2):
@@ -255,7 +269,7 @@ class QLearning:
             next_st1 = self.choose_next_action(st1, st2, q1, False)
             next_st2 = self.choose_next_action(st2, st1, q2, False)
             self.show_progress(st1, st2, next_st1, next_st2, self.q1, self.q2)
-            if self.is_game_won(next_st1, next_st2):
+            if self.is_game_won(next_st1) or self.is_game_won(next_st2):
                 print("Steps: %d" % steps)
                 break
             st1 = next_st1
