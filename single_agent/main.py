@@ -43,10 +43,9 @@ class QLearning:
         self.EPSILON = 0.2
         self.EPOCHS = 100
         self.INIT_Q_VALUE = 0  # in most cases should be zero
-        self.ALPHA = 0.1
         self.FRAME_RATE = 0.15
-        self.Q = {}
         self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
+        self.Q = {}
 
         self.success = 0
         self.failures = 0
