@@ -52,13 +52,14 @@ class State:
 
 class QLearning:
     def __init__(self):
-        self.GAMMA = .8
-        self.EPSILON = 0.2
+        self.GAMMA = 0.9
+        self.EPSILON = 0.3
         self.EPOCHS = 200
         self.INIT_Q_VALUE = 0  # in most cases should be zero
-        self.FRAME_RATE = 0.3
-        self.WALK_REWARDS = 0  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
+        self.FRAME_RATE = 0.1
+        self.WALK_REWARDS = -0.1  # IMPORTANT TO HAVE IT IN RANGE -0.3 .. 0
         self.MAX_ITERATIONS = 100000
+        self.TARGET = State(15, 8)
 
         self.success = 0
         self.failures = 0
@@ -84,6 +85,8 @@ class QLearning:
 
         self.agent1 = None
         self.agent2 = None
+
+        self.danger_states = set()
 
     def init_q(self, shift1, shift2):
         Q = {}
@@ -148,6 +151,7 @@ class QLearning:
         if randomly and random.random() < self.EPSILON:
             return random.choice(allowed)[0]
         else:
+            # safely = [state for state in allowed if (agent_a, state[0]) not in self.danger_states]
             q = [a[1] for a in allowed]
             max_q = max(q)
             count = q.count(max_q)
@@ -159,46 +163,62 @@ class QLearning:
 
     def get_max_q(self, Q, st1, st2):
         allowed = Q[st1][st2].items()
-        max_v = -1000
+        max_v = allowed[0][1]
         for allowed_state in allowed:
             if allowed_state[1] > max_v:
                 max_v = allowed_state[1]
         return max_v
 
-    def get_updated_q(self, Q, st1, st2, action, alpha, r, next_st1, next_st2):
+    def get_updated_q(self, Q, st1, st2, action, alpha, r, maxQ):
         #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
         # s' - old state
         return Q[st1][st2][action] + alpha * (
-            r + self.GAMMA * self.get_max_q(Q, next_st1, next_st2) - Q[st1][st2][action])
+            r + self.GAMMA * maxQ - Q[st1][st2][action])
 
     def is_game_failed(self, state):
         return self.ROOM[state.y][state.x] == -100
 
     def is_agents_too_far_away(self, st1, st2):
-        return (pow(st1.x - st2.x, 2) + pow(st1.y - st2.y, 2)) ** .5 > 2.6
+        return self.calc_distance(st1, st2) > 3
+
+    def calc_distance(self, st1, st2):
+        return (pow(st1.x - st2.x, 2) + pow(st1.y - st2.y, 2)) ** .5
 
     def is_game_won(self, state):
         return self.ROOM[state.y][state.x] == 100
 
-    def get_rewards(self, act1, act2):
+    def get_rewards(self, act1, act2, st1, st2):
         r1 = r2 = self.WALK_REWARDS
         restart = False
         fail = False
         win = False
 
         if act1.x == act2.x and act1.y == act2.y:
-            r1 = r2 = -1
+            # r1 = r2 = -1.
+            pass
 
         if self.is_game_won(act1) or self.is_game_won(act2):
-            r1 = r2 = 100
+            r1 = r2 = 100.
             win = True
 
-        if self.is_agents_too_far_away(act1, act2):
-            r1 = r2 = -100
+        if self.is_agents_too_far_away(act1, st2) and self.is_agents_too_far_away(act1, act2):
+            r1 = -100
             fail = True
 
-        if self.is_game_failed(act1) or self.is_game_failed(act2):
-            r1 = r2 = -100
+        if self.is_agents_too_far_away(act2, st1) and self.is_agents_too_far_away(act1, act2):
+            r2 = -100
+            fail = True
+
+        # if self.is_agents_too_far_away(act1, act2):
+        #     r1 = r2 = -100.
+        #     fail = True
+
+        if self.is_game_failed(act1):
+            r1 = -100.
+            fail = True
+
+        if self.is_game_failed(act2):
+            r2 = -100.
             fail = True
 
         if fail:
@@ -208,6 +228,16 @@ class QLearning:
             self.success += 1
             restart = True
 
+        # if not restart:
+        #     dist1 = self.calc_distance(act1, self.TARGET)
+        #     dist2 = self.calc_distance(act2, self.TARGET)
+        #     old_dist1 = self.calc_distance(st1, self.TARGET)
+        #     old_dist2 = self.calc_distance(st2, self.TARGET)
+        #     if dist1 - old_dist1 > 0:
+        #         r1 = r1/2.
+        #     if dist2 - old_dist2 > 0:
+        #         r2 = r2/2.
+
         return r1, r2, restart
 
     def next_actions(self, st1, st2):
@@ -215,24 +245,36 @@ class QLearning:
 
     @timer
     def training(self, start_st1, start_st2):
-        alpha = 1
+        alpha = 0.99
         st1, st2 = start_st1, start_st2
         act1, act2 = self.next_actions(st1, st2)
+        self.FRAME_RATE = 0.1
 
         while self.failures < self.MAX_ITERATIONS and self.success < self.EPOCHS:
 
             old_st1, old_st2 = st1, st2
             old_act1, old_act2 = act1, act2
 
-            r1, r2, restart = self.get_rewards(act1, act2)
+            r1, r2, restart = self.get_rewards(act1, act2, st1, st2)
 
-            u1 = self.get_updated_q(self.q1, old_st1, old_st2, old_act1, alpha, r1, act1, act2)
-            u2 = self.get_updated_q(self.q2, old_st2, old_st1, old_act2, alpha, r2, act2, act1)
+            # if self.failures > 1640:
+            #     self.show_progress(st1, st2, act1, act2, self.q1, self.q2)
+
+            # self.show_progress(st1, st2, act1, act2, self.q1, self.q2)
+
+            max_q1 = self.get_max_q(self.q1, act1, act2)
+            max_q2 = self.get_max_q(self.q2, act2, act1)
+
+            u1 = self.get_updated_q(self.q1, old_st1, old_st2, old_act1, alpha, r1, max_q1)
+            u2 = self.get_updated_q(self.q2, old_st2, old_st1, old_act2, alpha, r2, max_q2)
 
             self.q1[old_st1][old_st2][old_act1] = u1
             self.q2[old_st2][old_st1][old_act2] = u2
 
-            # self.show_progress(st1, st2, act1, act2, self.q1, self.q2)
+            if r1 == -100:
+                self.mark_danger_states(self.q1, st1, st2, act1)
+            if r2 == -100:
+                self.mark_danger_states(self.q2, st2, st1, act2)
 
             if restart:
                 st1, st2 = start_st1, start_st2
@@ -245,6 +287,11 @@ class QLearning:
             self.tick += 1
 
             self.show_statistics()
+
+    def mark_danger_states(self, q, st1, st2, act):
+        # if (st1, st2) not in self.danger_states:
+        #     self.danger_states.add((st1, st2))
+        del(q[st1][st2][act])
 
     def show_progress(self, st1, st2, st1_action, st2_action, q1, q2):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -301,7 +348,7 @@ class QLearning:
             if self.is_game_won(next_st1) or self.is_game_won(next_st2):
                 print("Steps: %d" % steps)
                 return True
-            if self.is_game_failed(next_st1) or self.is_game_failed(next_st2):
+            if self.is_game_failed(next_st1) or self.is_game_failed(next_st2) or self.is_agents_too_far_away(next_st1, next_st2):
                 return False
             st1 = next_st1
             st2 = next_st2
@@ -330,11 +377,10 @@ class QLearning:
 def run():
     q_learn = QLearning()
 
-    agent1 = State(0, 8, shift=1)
-    agent2 = State(1, 8, shift=2)
+    agent1 = State(1, 8, shift=1)
+    agent2 = State(0, 8, shift=2)
 
     q_learn.find_solution(agent1, agent2)
-
 
 if __name__ == '__main__':
     run()
