@@ -4,6 +4,7 @@ import random
 import os
 import time
 import sys
+import matplotlib.pyplot as plt
 
 
 def timer(fn):
@@ -84,6 +85,8 @@ class QLearning:
         self.q1 = {}
         self.q2 = {}
 
+        self.statistics = {'Q1': [], 'Q2': [], 'r1': [], 'r2': [], 'iter': []}
+
     def init_q(self, shift1, shift2):
         Q = {}
         agent1_possible_states = self.get_all_possible_states(shift=shift1)
@@ -130,7 +133,6 @@ class QLearning:
         return agent.y + agent.shift < self.HEIGHT
 
     def get_allowed_actions(self, state):
-        allowed = []
         allowed = [state.move_none]
         if self.is_movable_to_the_left(state):
             allowed.append(state.move_left)
@@ -165,10 +167,11 @@ class QLearning:
         return max_v
 
     def get_updated_q(self, Q, st1, st2, action, alpha, r, maxQ):
-        #  Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
-        #  s' -> old state
-        return Q[st1][st2][action] + alpha * (
-            r + self.GAMMA * maxQ - Q[st1][st2][action])
+        """
+            Q[s',a'] = Q[s',a'] + alpha * (reward + gamma * MAX(Q,s) - Q[s',a'])
+            #  s' -> old state
+        """
+        return Q[st1][st2][action] + alpha * (r + self.GAMMA * maxQ - Q[st1][st2][action])
 
     def is_game_failed(self, state):
         return self.ROOM[state.y][state.x] == self.DEATH
@@ -230,7 +233,7 @@ class QLearning:
 
     @timer
     def training(self, start_st1, start_st2):
-        alpha = 0.99
+        alpha = 1
         st1, st2 = start_st1, start_st2
         act1, act2 = self.next_actions(st1, st2)
         self.FRAME_RATE = 0.1
@@ -266,6 +269,12 @@ class QLearning:
 
             self.show_statistics()
 
+            self.statistics["Q1"].append(u1)
+            self.statistics["Q2"].append(u2)
+            self.statistics["r1"].append(r1)
+            self.statistics["r2"].append(r2)
+            self.statistics["iter"].append(self.tick)
+
     def mark_danger_states(self, q, st1, st2, act):
         del (q[st1][st2][act])
 
@@ -294,7 +303,7 @@ class QLearning:
 
     def show_final_result(self, st1, st2, q1, q2):
         steps = 0
-        self.FRAME_RATE = 0.25
+        self.FRAME_RATE = 0.35
         next_st1, next_st2 = st1, st2
         print("Final result")
         while True:
@@ -354,6 +363,24 @@ class QLearning:
         raw_input("show final result")
         self.show_final_result(agent1, agent2, self.q1, self.q2)
 
+    def show_graph(self):
+        plt.subplot(221)
+        plt.plot(self.statistics["iter"], self.statistics["Q1"], lw=1)
+        plt.title('Iter/Q1')
+
+        plt.subplot(222)
+        plt.plot(self.statistics["iter"], self.statistics["Q2"], lw=1)
+        plt.title('Iter/Q2')
+
+        plt.subplot(223)
+        plt.plot(self.statistics["iter"], self.statistics["r1"], lw=1)
+        plt.title('Iter/Rewards1')
+
+        plt.subplot(224)
+        plt.plot(self.statistics["iter"], self.statistics["r2"], lw=1)
+        plt.title('Iter/Rewards2')
+        plt.show()
+
 
 def run():
     q_learn = QLearning()
@@ -362,6 +389,8 @@ def run():
     agent2 = State(0, 8, shift=2)
 
     q_learn.find_solution(agent1, agent2)
+
+    q_learn.show_graph()
 
 
 if __name__ == '__main__':
