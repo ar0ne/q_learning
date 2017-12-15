@@ -269,11 +269,14 @@ class QLearning:
 
             self.show_statistics()
 
-            self.statistics["Q1"].append(u1)
-            self.statistics["Q2"].append(u2)
-            self.statistics["r1"].append(r1)
-            self.statistics["r2"].append(r2)
-            self.statistics["iter"].append(self.tick)
+            self.capture_statistics(r1, r2, u1, u2)
+
+    def capture_statistics(self, r1, r2, u1, u2):
+        self.statistics["Q1"].append(u1)
+        self.statistics["Q2"].append(u2)
+        self.statistics["r1"].append(r1)
+        self.statistics["r2"].append(r2)
+        self.statistics["iter"].append(self.tick)
 
     def mark_danger_states(self, q, st1, st2, act):
         del (q[st1][st2][act])
