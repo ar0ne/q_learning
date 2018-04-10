@@ -4,7 +4,7 @@ import random
 import os
 import time
 import sys
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 def timer(fn):
@@ -329,60 +329,23 @@ class QLearning:
         sys.stdout.write('\rSuccess: %d, Failures: %d' % (self.success, self.failures))
         sys.stdout.flush()
 
-    def test_run(self, st1, st2, q1, q2, limit=100):
-        steps = 0
-        self.FRAME_RATE = 0.1
-        print("Test run")
-        while steps < limit:
-            next_st1 = self.choose_next_action(st1, st2, q1, False)
-            next_st2 = self.choose_next_action(st2, st1, q2, False)
-            self.show_progress(st1, st2, next_st1, next_st2, self.q1, self.q2)
-            if self.is_game_won(next_st1) or self.is_game_won(next_st2):
-                print("Steps: %d" % steps)
-                return True
-            if self.is_game_failed(next_st1) or self.is_game_failed(next_st2) or self.is_agents_too_far_away(next_st1,
-                                                                                                             next_st2):
-                return False
-            st1 = next_st1
-            st2 = next_st2
-            steps += 1
-        return False
-
-    def find_solution(self, agent1, agent2):
-        is_solved = False
-        attempt = 0
-        self.q1 = self.init_q(agent1.shift, agent2.shift)
-        self.q2 = self.init_q(agent2.shift, agent1.shift)
-        while not is_solved:
-            attempt += 1
-            self.success = self.failures = 0
-            self.training(agent1, agent2)
-            is_solved = self.test_run(agent1, agent2, self.q1, self.q2)
-            if attempt > 5:
-                self.q1 = self.init_q(agent1.shift, agent2.shift)
-                self.q2 = self.init_q(agent2.shift, agent1.shift)
-                attempt = 0
-
-        raw_input("show final result")
-        self.show_final_result(agent1, agent2, self.q1, self.q2)
-
-    def show_graph(self):
-        plt.subplot(221)
-        plt.plot(self.statistics["iter"], self.statistics["Q1"], lw=1)
-        plt.title('Iter/Q1')
-
-        plt.subplot(222)
-        plt.plot(self.statistics["iter"], self.statistics["Q2"], lw=1)
-        plt.title('Iter/Q2')
-
-        plt.subplot(223)
-        plt.plot(self.statistics["iter"], self.statistics["r1"], lw=1)
-        plt.title('Iter/Rewards1')
-
-        plt.subplot(224)
-        plt.plot(self.statistics["iter"], self.statistics["r2"], lw=1)
-        plt.title('Iter/Rewards2')
-        plt.show()
+    # def show_graph(self):
+    #     plt.subplot(221)
+    #     plt.plot(self.statistics["iter"], self.statistics["Q1"], lw=1)
+    #     plt.title('Iter/Q1')
+    #
+    #     plt.subplot(222)
+    #     plt.plot(self.statistics["iter"], self.statistics["Q2"], lw=1)
+    #     plt.title('Iter/Q2')
+    #
+    #     plt.subplot(223)
+    #     plt.plot(self.statistics["iter"], self.statistics["r1"], lw=1)
+    #     plt.title('Iter/Rewards1')
+    #
+    #     plt.subplot(224)
+    #     plt.plot(self.statistics["iter"], self.statistics["r2"], lw=1)
+    #     plt.title('Iter/Rewards2')
+    #     plt.show()
 
 
 def run():
@@ -391,9 +354,14 @@ def run():
     agent1 = State(1, 8, shift=1)
     agent2 = State(0, 8, shift=2)
 
-    q_learn.find_solution(agent1, agent2)
+    q_learn.q1 = q_learn.init_q(agent1.shift, agent2.shift)
+    q_learn.q2 = q_learn.init_q(agent2.shift, agent1.shift)
 
-    q_learn.show_graph()
+    q_learn.training(agent1, agent2)
+
+    q_learn.show_final_result(agent1, agent2, q_learn.q1, q_learn.q2)
+
+    # q_learn.show_graph()
 
 
 if __name__ == '__main__':

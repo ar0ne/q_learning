@@ -3,7 +3,7 @@ from __future__ import print_function
 import random
 import time
 import os
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 class State:
@@ -207,15 +207,15 @@ class QLearning:
             state = next_state
             steps += 1
 
-    def show_graph(self):
-        plt.subplot(211)
-        plt.plot(self.statistics["iter"], self.statistics["Q"], lw=1)
-        plt.title('Iter/Q')
-
-        plt.subplot(212)
-        plt.plot(self.statistics["iter"], self.statistics["rewards"], lw=1)
-        plt.title('Iter/Rewards')
-        plt.show()
+    # def show_graph(self):
+    #     plt.subplot(211)
+    #     plt.plot(self.statistics["iter"], self.statistics["Q"], lw=1)
+    #     plt.title('Iter/Q')
+    #
+    #     plt.subplot(212)
+    #     plt.plot(self.statistics["iter"], self.statistics["rewards"], lw=1)
+    #     plt.title('Iter/Rewards')
+    #     plt.show()
 
 
 def run():
@@ -227,7 +227,7 @@ def run():
 
     q_learning.show_final_result(s)
 
-    q_learning.show_graph()
+    # q_learning.show_graph()
 
 
 if __name__ == '__main__':
