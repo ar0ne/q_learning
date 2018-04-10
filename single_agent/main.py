@@ -5,6 +5,10 @@ import time
 import os
 # import matplotlib.pyplot as plt
 
+try:
+    xrange
+except NameError:
+    xrange = range
 
 class State:
     def __init__(self, pos_x=0, pos_y=0, action=''):
@@ -103,7 +107,7 @@ class QLearning:
         return allowed
 
     def choose_next_action(self, state, randomly=True):
-        allowed = self.Q[state].items()
+        allowed = list(self.Q[state].items())
         if randomly and random.random() < self.EPSILON:
             return random.choice(allowed)[0]
         else:

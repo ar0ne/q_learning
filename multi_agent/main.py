@@ -6,6 +6,10 @@ import time
 import sys
 # import matplotlib.pyplot as plt
 
+try:
+    xrange
+except NameError:
+    xrange = range
 
 def timer(fn):
     def wrapped(*args, **kwargs):
@@ -145,7 +149,7 @@ class QLearning:
         return allowed
 
     def choose_next_action(self, agent_a, agent_b, agent_a_Q, randomly=True):
-        allowed = agent_a_Q[agent_a][agent_b].items()
+        allowed = list(agent_a_Q[agent_a][agent_b].items())
         if randomly and random.random() < self.EPSILON:
             return random.choice(allowed)[0]
         else:
@@ -159,7 +163,7 @@ class QLearning:
                 return [a[0] for a in allowed if a[1] == max_q][0]
 
     def get_max_q(self, Q, st1, st2):
-        allowed = Q[st1][st2].items()
+        allowed = list(Q[st1][st2].items())
         max_v = allowed[0][1]
         for allowed_state in allowed:
             if allowed_state[1] > max_v:

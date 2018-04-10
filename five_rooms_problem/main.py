@@ -2,6 +2,10 @@
 from __future__ import print_function
 import random
 
+try:
+    xrange
+except NameError:
+    xrange = range
 
 class QLearning():
     def __init__(self):
