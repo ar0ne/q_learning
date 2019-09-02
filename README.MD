@@ -27,8 +27,7 @@ See description [here](http://mnemstudio.org/path-finding-q-learning-tutorial.ht
 
 ## Installation
 
-Python 2.7
-
+```
 $ sudo -H pip install -r requirements.txt
-
 $ sudo apt-get install tcl-dev tk-dev python-tk python3-tk
+```
